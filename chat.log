@@ -1,0 +1,13 @@
+client 0 has connected
+client 1 has connected
+client 2 has connected
+client 2 exited with error: Error: read ECONNRESET
+client 3 has connected
+client 3: hello
+client 3 disconnected
+client 0 exited with error: Error: read ECONNRESET
+client 4 has connected
+client 5 has connected
+client 1 exited with error: Error: read ECONNRESET
+client 4 exited with error: Error: read ECONNRESET
+client 5 exited with error: Error: read ECONNRESET
