@@ -46,38 +46,40 @@ const saveMessage = (message) => {
   chatLogStream.write(`${message}\n`);
 };
 
-const extractCommand = (message) => {
+const doCommand = (sender, message) => {
   const args = message.slice(1).split(" "); // Remove "/" and split by spaces
-
   switch (args[0]) {
     case "w": {
-      // whisper
+      whisper(sender, args[1], ...args.slice(2));
       break;
     }
     default: {
-      return null;
+      return;
     }
   }
 };
 
 const whisper = (sender, target, message) => {
   const parsedTarget = parseInt(target);
-  let targetClient = null;
 
   if (!isNaN(parsedTarget)) {
     target = parsedTarget;
   }
-  console.log(target);
 
-  if (sender.id === target) {
-    sender.write("you can't whisper yourself");
-    return;
-  }
-  if (sender.name === target) {
+  if (sender.name === target || sender.id === target) {
     sender.write(
       "you can't whisper yourself, or you have the same name as someone else"
     );
     return;
+  }
+
+  for (let i = 0; i < clients.length; i++) {
+    const client = clients[i];
+    if (client.id === target || client.name === target) {
+      client.write(message);
+      saveMessage(message);
+      break;
+    }
   }
 };
 
@@ -133,8 +135,7 @@ const server = net
           }
         });
       } else {
-        const command = extractCommand(data);
-        console.log(`user entered command: ${command}`);
+        doCommand(client, data);
       }
     });
 
