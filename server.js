@@ -92,7 +92,7 @@ const server = net
 
     client.on("end", () => {
       if (!client.removed) {
-        const message = `client ${client.id} disconnected`;
+        const message = `${client.name} disconnected`;
         console.log(message);
         saveMessage(message);
 
@@ -103,7 +103,7 @@ const server = net
 
     client.on("close", (hadError) => {
       if (!client.removed) {
-        const message = `client ${client.id} disconnected with error?: ${hadError}`;
+        const message = `${client.name} disconnected with error?: ${hadError}`;
         console.log(message);
         saveMessage(message);
 
@@ -114,7 +114,7 @@ const server = net
 
     client.on("error", (err) => {
       if (!client.removed) {
-        const message = `client ${client.id} exited with error: ${err}`;
+        const message = `${client.name} exited with error: ${err}`;
         console.error(message);
         saveMessage(message);
 
@@ -127,7 +127,7 @@ const server = net
       data = data.toString("utf8");
 
       if (data[0] !== "/") {
-        saveMessage(`client ${client.id}: ${data}`);
+        saveMessage(`${client.name}: ${data}`);
 
         clients.forEach((c) => {
           if (c.id !== client.id) {
@@ -139,13 +139,14 @@ const server = net
       }
     });
 
-    const joinMessage = `client ${client.id} has connected`;
+    const joinMessage = `${client.name} has connected`;
     console.log(joinMessage);
 
     saveMessage(joinMessage);
 
     client.write(
-      `welcome to the server, your id is ${client.id}, use the console to send messages, exit via "exit"`
+      `welcome to the server, your id and username is ${client.id}\nvalid commands:\nexit\n/w otherUsernameOrId message content\n/username yourNewUsername\n/kick otherUserId adminPassword\n/clientlist
+      `
     );
 
     clients.push(client);
