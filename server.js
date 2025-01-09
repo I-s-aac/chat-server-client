@@ -30,15 +30,19 @@ If there is no error then a private message should be sent to the kicked user in
 
 let clients = [];
 let id = 0;
+const adminKickPassword = "gottem";
 
 const removeClient = (client) => {
-  sendToAllClients(`${client.name} disconnected`);
+  const message = client.kicked
+    ? `${client.name} was kicked`
+    : `${client.name} disconnected`;
+  sendToAllClients(message);
   clients = clients.filter((c) => c.id !== client.id);
 };
 
-const sendToAllClients = (message) => {
+const sendToAllClients = (message, clientToExcludeId = null) => {
   clients.forEach((client) => {
-    client.write(message);
+    if (client.id !== clientToExcludeId) client.write(message);
   });
 };
 
@@ -50,7 +54,7 @@ const doCommand = (sender, message) => {
   const args = message.slice(1).split(" "); // Remove "/" and split by spaces
   switch (args[0]) {
     case "w": {
-      whisper(sender, args[1], ...args.slice(2));
+      whisper(sender, message);
       break;
     }
     case "username": {
@@ -58,7 +62,7 @@ const doCommand = (sender, message) => {
       break;
     }
     case "kick": {
-      kick(sender /* additional stuff */);
+      kick(sender, args[1], args[2]);
       break;
     }
     case "clientlist": {
@@ -67,37 +71,65 @@ const doCommand = (sender, message) => {
     }
     default: {
       sender.write("unknown command");
-      saveMessage(`name: ${sender.name}, id: ${sender.id} sent an invalid command: ${message}`)
+      saveMessage(
+        `name: ${sender.name}, id: ${sender.id} sent an invalid command: ${message}`
+      );
       break;
     }
   }
 };
 
-const whisper = (sender, target, message) => {
-  const parsedTarget = parseInt(target);
+const whisper = (sender, args) => {
+  args = args.slice(2); // remove the "/w" at the start
 
+  let target = args.split(" ").slice(1, 2).join(" ").trim();
+  let message = args.split(" ").slice(2).join(" ").trim();
+
+  console.log(`'${args}', '${target}', '${message}'`);
+
+  const parsedTarget = parseInt(target);
   if (!isNaN(parsedTarget)) {
     target = parsedTarget;
   }
 
-  if (sender.name === target || sender.id === target) {
-    sender.write(
-      "you can't whisper yourself, or you have the same name as someone else"
-    );
+  if (target === undefined || target === "") {
+    sender.write("no target specified");
     saveMessage(
-      `name: ${sender.name} id: ${sender.id} failed to whisper to ${target}`
+      `name: ${sender.name}, id: ${sender.id} failed to whisper due to no target`
     );
     return;
   }
-
   for (let i = 0; i < clients.length; i++) {
     const client = clients[i];
     if (client.id === target || client.name === target) {
+      if (message === undefined || message === "") {
+        sender.write("no message entered");
+        saveMessage(
+          `name: ${sender.name}, id: ${sender.id} failed to whisper due to no message`
+        );
+        return;
+      }
+      if (sender.name === target || sender.id === target) {
+        sender.write("you can't whisper yourself");
+        saveMessage(
+          `name: ${sender.name} id: ${sender.id} failed to whisper to ${target}`
+        );
+        return;
+      }
+      // this is reached if all other checks are passed
+      message = `${sender.name} (to you): ${message}`;
       client.write(message);
       saveMessage(message);
       return;
     }
   }
+
+  // no target was found
+  sender.write("target wasn't found");
+  saveMessage(
+    `name: ${sender.name}, id: ${sender.id} tried to whisper ${message} to unknown client ${target}`
+  );
+  return;
 };
 
 const changeUsername = (sender, args) => {
@@ -149,22 +181,53 @@ const changeUsername = (sender, args) => {
   }
   // and now after all the checks, can actually change the username
   const changeMessage = `client with name ${sender.name} and id ${sender.id} changed their username to ${newUsername}`;
+  sender.write(
+    `successfully updated username from ${sender.name} to ${newUsername}`
+  );
   sender.name = newUsername;
-  sendToAllClients(changeMessage);
+  sendToAllClients(changeMessage, sender.id);
   saveMessage(changeMessage);
 };
 
 const kick = (sender, target, password) => {
-  const invalidPassword = true;
-  if (invalidPassword) {
-    // tell user password is invalid
+  console.log(target, password);
+  if (sender.id === target || sender.name === target) {
+    sender.write("you can't kick yourself");
+    saveMessage(
+      `name: ${sender.name}, id: ${sender.id} tried to kick themselves`
+    );
     return;
   }
-  const targetDoesNotExist = true;
-  if (targetDoesNotExist) {
-    // tell user no client exists with username or id x
-    return;
+
+  for (let i = 0; i < clients.length; i++) {
+    const client = clients[i];
+    if (client.id === target || client.name === target) {
+      if (!password) {
+        sender.write("password not entered or format wrong");
+        saveMessage(
+          `name: ${sender.name}, id: ${sender.id} tried to kick ${target} without using the password`
+        );
+        return;
+      }
+      if (password !== adminKickPassword) {
+        sender.write("invalid password");
+        saveMessage(
+          `name: ${sender.name}, id: ${sender.id} tried to kick ${target} with incorrect password ${password}`
+        );
+        return;
+      }
+      // this should only be reached if all checks are passed
+      client.kicked = true;
+      client.write("you've been kicked\n");
+      client.write("kick"); // when client receives "kick" from the server, it disconnects
+      return;
+    }
   }
+  sender.write(`couldn't find client '${target}'`);
+  saveMessage(
+    `name: ${sender.name}, id: ${sender.id} attempted to kick unknown client ${target}`
+  );
+  return;
 };
 
 const listClientsTo = (sender) => {
@@ -201,10 +264,13 @@ const server = net
     client.id = ensureUniqueId();
     client.name = client.id.toString();
     client.removed = false;
+    client.kicked = false;
 
     client.on("end", () => {
       if (!client.removed) {
-        const message = `name: ${client.name}, id: ${client.id} disconnected`;
+        let message = `name: ${client.name}, id: ${client.id}`;
+        message += client.kicked ? " was kicked" : " disconnected";
+
         console.log(message);
         saveMessage(message);
 
@@ -243,11 +309,7 @@ const server = net
       } else {
         saveMessage(`name: ${client.name}, id: ${client.id}, message: ${data}`);
 
-        clients.forEach((c) => {
-          if (c.id !== client.id) {
-            c.write(`${client.name}: ${data}`);
-          }
-        });
+        sendToAllClients(`${client.name}: ${data}`, client.id);
       }
     });
 

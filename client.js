@@ -15,8 +15,12 @@ const client = net.createConnection({ port: 3000 }, () => {
 client.setEncoding("utf8");
 
 client.on("data", (data) => {
-  // console.log("server:", data);
-  console.log(data);
+  if (data === "kick") {
+    client.end();
+    rl.close();
+  } else {
+    console.log(data);
+  }
 });
 
 const doQuestion = () => {
