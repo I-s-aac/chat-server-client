@@ -1,0 +1,13 @@
+0 has connected
+1 has connected
+2 has connected
+0: test
+0: hello
+name: 0 id: 0 disconnected
+3 has connected
+1: aaaa
+name: 3 id: 3 disconnected
+3 has connected
+2 exited with error: Error: read ECONNRESET
+1 exited with error: Error: read ECONNRESET
+3 exited with error: Error: read ECONNRESET

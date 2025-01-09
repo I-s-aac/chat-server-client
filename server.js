@@ -31,10 +31,9 @@ If there is no error then a private message should be sent to the kicked user in
 let clients = [];
 let id = 0;
 
-const removeClient = (removeId) => {
-  clients = clients.filter((c) => c.id !== removeId);
-  // implement username for the disconnection instead of removeId
-  sendToAllClients(`${removeId} disconnected`);
+const removeClient = (client) => {
+  sendToAllClients(`${client.name} disconnected`);
+  clients = clients.filter((c) => c.id !== client.id);
 };
 
 const sendToAllClients = (message) => {
@@ -49,7 +48,6 @@ const saveMessage = (message) => {
 
 const doCommand = (sender, message) => {
   const args = message.slice(1).split(" "); // Remove "/" and split by spaces
-  console.log(args);
   switch (args[0]) {
     case "w": {
       whisper(sender, args[1], ...args.slice(2));
@@ -84,6 +82,9 @@ const whisper = (sender, target, message) => {
     sender.write(
       "you can't whisper yourself, or you have the same name as someone else"
     );
+    saveMessage(
+      `name: ${sender.name} id: ${sender.id} failed to whisper to ${target}`
+    );
     return;
   }
 
@@ -92,25 +93,63 @@ const whisper = (sender, target, message) => {
     if (client.id === target || client.name === target) {
       client.write(message);
       saveMessage(message);
-      break;
+      return;
     }
   }
 };
 
 const changeUsername = (sender, args) => {
+  const newUsername = args[1] || "";
+
+  if (args.length === 1) {
+    // no username entered
+    sender.write("new username wasn't entered");
+    saveMessage(
+      `name: ${sender.name} id: ${sender.id} failed to change their username to "${newUsername}" because it was not entered`
+    );
+    return;
+  }
+  if (newUsername === "") {
+    // no username entered
+    sender.write("username is blank");
+    saveMessage(
+      `name: ${sender.name} id: ${sender.id} failed to change their username to "${newUsername}" because it was blank`
+    );
+    return;
+  }
   if (args.length > 2) {
     // username can't contain spaces
+    sender.write("new username can't contain spaces");
+    saveMessage(
+      `name: ${sender.name} id: ${sender.id} failed to change their username to "${newUsername}" because it contained spaces.`
+    );
     return;
   }
-  const usernameIsNotNew = true;
-  if (usernameIsNotNew) {
+
+  if (newUsername === sender.name) {
     // client has the same username as they are trying to change it to
-  }
-  const usernameAlreadyExists = true;
-  if (usernameAlreadyExists) {
-    // can't be an already existing username, tell user
+    sender.write("new username is the same as previous username");
+    saveMessage(
+      `name: ${sender.name} id: ${sender.id} failed to change their username to "${newUsername}" because it was the same as their previous username`
+    );
     return;
   }
+  for (let i = 0; i < clients.length; i++) {
+    console.log(newUsername, clients[i].name);
+    if (clients[i].name === newUsername) {
+      // username conflict
+      sender.write("new username is already in use");
+      saveMessage(
+        `name: ${sender.name} id: ${sender.id} failed to change their username to "${newUsername}" because it conflicted`
+      );
+      return;
+    }
+  }
+  // and now after all the checks, can actually change the username
+  const changeMessage = `client with name ${sender.name} and id ${sender.id} changed their username to ${newUsername}`;
+  sender.name = newUsername;
+  sendToAllClients(changeMessage);
+  saveMessage(changeMessage);
 };
 
 const kick = (sender, target, password) => {
@@ -132,10 +171,22 @@ const listClientsTo = (sender) => {
 
 const server = net
   .createServer((client) => {
-    client.id = id;
-    client.name = id;
+    if (id > clients.length) id = clients.length;
+    // recursive function to make sure new clients don't have the same id or username as currnent clients
+    const ensureUniqueId = () => {
+      for (let i = 0; i < clients.length; i++) {
+        const c = clients[i];
+        if (id === c.id || id === c.name) {
+          id++;
+          ensureUniqueId();
+        }
+      }
+      return id;
+    };
+
+    client.id = ensureUniqueId();
+    client.name = client.id.toString();
     client.removed = false;
-    id++;
 
     client.on("end", () => {
       if (!client.removed) {
@@ -143,7 +194,7 @@ const server = net
         console.log(message);
         saveMessage(message);
 
-        removeClient(client.id);
+        removeClient(client);
         client.removed = true;
       }
     });
@@ -154,7 +205,7 @@ const server = net
         console.log(message);
         saveMessage(message);
 
-        removeClient(client.id);
+        removeClient(client);
         client.removed = true;
       }
     });
@@ -165,7 +216,7 @@ const server = net
         console.error(message);
         saveMessage(message);
 
-        removeClient(client.id);
+        removeClient(client);
         client.removed = true;
       }
     });
@@ -173,7 +224,9 @@ const server = net
     client.on("data", (data) => {
       data = data.toString("utf8");
 
-      if (data[0] !== "/") {
+      if (data[0] === "/") {
+        doCommand(client, data);
+      } else {
         saveMessage(`${client.name}: ${data}`);
 
         clients.forEach((c) => {
@@ -181,8 +234,6 @@ const server = net
             c.write(`${client.name}: ${data}`);
           }
         });
-      } else {
-        doCommand(client, data);
       }
     });
 
