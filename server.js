@@ -33,7 +33,8 @@ let id = 0;
 
 const removeClient = (removeId) => {
   clients = clients.filter((c) => c.id !== removeId);
-  sendToAllClients(`client ${removeId} disconnected`);
+  // implement username for the disconnection instead of removeId
+  sendToAllClients(`${removeId} disconnected`);
 };
 
 const sendToAllClients = (message) => {
@@ -48,9 +49,22 @@ const saveMessage = (message) => {
 
 const doCommand = (sender, message) => {
   const args = message.slice(1).split(" "); // Remove "/" and split by spaces
+  console.log(args);
   switch (args[0]) {
     case "w": {
       whisper(sender, args[1], ...args.slice(2));
+      break;
+    }
+    case "username": {
+      changeUsername(sender, args);
+      break;
+    }
+    case "kick": {
+      kick(sender /* additional stuff */);
+      break;
+    }
+    case "clientlist": {
+      listClientsTo(sender);
       break;
     }
     default: {
@@ -83,6 +97,39 @@ const whisper = (sender, target, message) => {
   }
 };
 
+const changeUsername = (sender, args) => {
+  if (args.length > 2) {
+    // username can't contain spaces
+    return;
+  }
+  const usernameIsNotNew = true;
+  if (usernameIsNotNew) {
+    // client has the same username as they are trying to change it to
+  }
+  const usernameAlreadyExists = true;
+  if (usernameAlreadyExists) {
+    // can't be an already existing username, tell user
+    return;
+  }
+};
+
+const kick = (sender, target, password) => {
+  const invalidPassword = true;
+  if (invalidPassword) {
+    // tell user password is invalid
+    return;
+  }
+  const targetDoesNotExist = true;
+  if (targetDoesNotExist) {
+    // tell user no client exists with username or id x
+    return;
+  }
+};
+
+const listClientsTo = (sender) => {
+  return;
+};
+
 const server = net
   .createServer((client) => {
     client.id = id;
@@ -92,7 +139,7 @@ const server = net
 
     client.on("end", () => {
       if (!client.removed) {
-        const message = `${client.name} disconnected`;
+        const message = `name: ${client.name} id: ${client.id} disconnected`;
         console.log(message);
         saveMessage(message);
 
@@ -103,7 +150,7 @@ const server = net
 
     client.on("close", (hadError) => {
       if (!client.removed) {
-        const message = `${client.name} disconnected with error?: ${hadError}`;
+        const message = `name: ${client.name} id: ${client.id} disconnected with error?: ${hadError}`;
         console.log(message);
         saveMessage(message);
 
@@ -131,7 +178,7 @@ const server = net
 
         clients.forEach((c) => {
           if (c.id !== client.id) {
-            c.write(`${client.id}: ${data}`);
+            c.write(`${client.name}: ${data}`);
           }
         });
       } else {
@@ -145,8 +192,7 @@ const server = net
     saveMessage(joinMessage);
 
     client.write(
-      `welcome to the server, your id and username is ${client.id}\nvalid commands:\nexit\n/w otherUsernameOrId message content\n/username yourNewUsername\n/kick otherUserId adminPassword\n/clientlist
-      `
+      `welcome to the server, your id and username is ${client.name}\nvalid commands:\nexit\n/w otherUsernameOrId message content\n/username yourNewUsername\n/kick otherClientIdOrUsername adminPassword\n/clientlist`
     );
 
     clients.push(client);
