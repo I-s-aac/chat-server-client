@@ -66,7 +66,9 @@ const doCommand = (sender, message) => {
       break;
     }
     default: {
-      return;
+      sender.write("unknown command");
+      saveMessage(`name: ${sender.name}, id: ${sender.id} sent an invalid command: ${message}`)
+      break;
     }
   }
 };
@@ -166,7 +168,19 @@ const kick = (sender, target, password) => {
 };
 
 const listClientsTo = (sender) => {
-  return;
+  let message = "client list:\n";
+
+  for (let i = 0; i < clients.length; i++) {
+    const target = clients[i];
+    message += `name: ${target.name}, id: ${target.id}`;
+    if (target.id === sender.id && target.name === sender.name) {
+      message += ` (you)`;
+    }
+    message += "\n";
+  }
+
+  sender.write(message);
+  saveMessage(`name: ${sender.name}, id: ${sender.id} requested client list`);
 };
 
 const server = net
@@ -190,7 +204,7 @@ const server = net
 
     client.on("end", () => {
       if (!client.removed) {
-        const message = `name: ${client.name} id: ${client.id} disconnected`;
+        const message = `name: ${client.name}, id: ${client.id} disconnected`;
         console.log(message);
         saveMessage(message);
 
@@ -201,7 +215,7 @@ const server = net
 
     client.on("close", (hadError) => {
       if (!client.removed) {
-        const message = `name: ${client.name} id: ${client.id} disconnected with error?: ${hadError}`;
+        const message = `name: ${client.name}, id: ${client.id} disconnected with error?: ${hadError}`;
         console.log(message);
         saveMessage(message);
 
@@ -212,7 +226,7 @@ const server = net
 
     client.on("error", (err) => {
       if (!client.removed) {
-        const message = `${client.name} exited with error: ${err}`;
+        const message = `name: ${client.name}, id: ${client.id} exited with error: ${err}`;
         console.error(message);
         saveMessage(message);
 
@@ -227,7 +241,7 @@ const server = net
       if (data[0] === "/") {
         doCommand(client, data);
       } else {
-        saveMessage(`${client.name}: ${data}`);
+        saveMessage(`name: ${client.name}, id: ${client.id}, message: ${data}`);
 
         clients.forEach((c) => {
           if (c.id !== client.id) {
